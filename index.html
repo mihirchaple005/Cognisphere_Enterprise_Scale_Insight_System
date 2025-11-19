@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Skill Extraction & HR Matching Portal</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 40px; background: #f9fafc; }
+    h2 { color: #2c3e50; }
+    .card { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.1); margin-bottom: 30px; }
+    button { background: #2c7be5; color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; }
+    button:hover { background: #1b5dbf; }
+    input, textarea { width: 100%; margin: 10px 0; padding: 8px; border-radius: 6px; border: 1px solid #ccc; }
+    pre { background: #eef3f8; padding: 10px; border-radius: 8px; overflow-x: auto; }
+    .result { background: #eef3f8; border-radius: 8px; padding: 15px; margin: 10px 0; }
+    .employee { background: #f1f5ff; border-left: 4px solid #2c7be5; padding: 10px; margin: 10px 0; border-radius: 6px; }
+    .skills { color: #2c3e50; font-size: 0.95rem; }
+    .score { font-weight: bold; color: #2c7be5; }
+  </style>
+</head>
+<body>
+
+  <h2>📄 Skill Extraction & HR Matching Portal</h2>
+
+  <div class="card">
+    <h3>1️⃣ Extract Skills from Resumes</h3>
+    <form id="uploadForm">
+      <input type="file" id="files" name="files" multiple required><br>
+      <button type="submit">Extract Skills</button>
+    </form>
+    <div id="skillOutput" class="result"></div>
+  </div>
+
+  <div class="card">
+    <h3>2️⃣ Find Best Employees for Job Role</h3>
+    <form id="jobForm">
+      <label>Enter Job Description:</label>
+      <textarea id="job_description" rows="4" placeholder="Enter job requirements..."></textarea>
+      <label>Top K Matches:</label>
+      <input type="number" id="k_value" value="5" min="1" max="20">
+      <button type="submit">Find Matches</button>
+    </form>
+    <div id="matchOutput" class="result"></div>
+  </div>
+
+  <script>
+    const BASE_URL = "http://127.0.0.1:8000";  // Flask backend
+
+    // ---- Skill Extraction ----
+    document.getElementById('uploadForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const files = document.getElementById('files').files;
+      const formData = new FormData();
+      for (let file of files) formData.append('files', file);
+
+      const res = await fetch(`${BASE_URL}/extract_skills`, { method: 'POST', body: formData });
+      const data = await res.json();
+
+      // Display extracted skills
+      let html = "";
+      data.forEach((entry, i) => {
+        html += `<div class="employee">
+          <strong>📄 Document ${i + 1}:</strong><br>
+          <div class="skills">Extracted Skills: ${entry.skills.join(", ")}</div>
+        </div>`;
+      });
+      document.getElementById('skillOutput').innerHTML = html || "No skills found.";
+    });
+
+    // ---- HR Matching ----
+    document.getElementById('jobForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const job_description = document.getElementById('job_description').value;
+      const k = document.getElementById('k_value').value;
+
+      const res = await fetch(`${BASE_URL}/find_best_employees`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ job_description, k })
+      });
+
+      const data = await res.json();
+
+      // Display top-k employees
+      let html = "";
+      if (data.top_employees && data.top_employees.length > 0) {
+        data.top_employees.forEach((emp, i) => {
+          html += `<div class="employee">
+            <strong>👤 Rank ${i + 1}: ${emp.name}</strong><br>
+            <div class="score">Similarity Score: ${(emp.similarity * 100).toFixed(2)}%</div>
+            <div>Experience: ${emp.experience} years</div>
+            <div class="skills">Skills: ${emp.skills.join(", ")}</div>
+          </div>`;
+        });
+      } else {
+        html = "No matching employees found.";
+      }
+
+      document.getElementById('matchOutput').innerHTML = html;
+    });
+  </script>
+
+</body>
+</html>
