@@ -68,8 +68,29 @@ def preprocess(text):
     doc = nlp(text)
     return " ".join([t.lemma_ for t in doc if not t.is_punct and not t.is_space])
 
+#helpers
+def fuzzy_match(candidate, limit=5, score_cutoff=80):
+    matches = process.extract(candidate, SKILLS, scorer=fuzz.token_sort_ratio, limit=limit)
+    return [(m[0], m[1]) for m in matches if m[1] >= score_cutoff]
+
+def semantic_match(candidate, top_k=3, score_cutoff=0.7):
+    cand_emb = embed_model.encode(candidate.lower(), convert_to_tensor=True)
+    cos_scores = util.cos_sim(cand_emb, SKILL_EMBEDDINGS)[0]
+    top_results = torch.topk(cos_scores, top_k)
+    results = []
+    for idx, score in zip(top_results[1].cpu().numpy(), top_results[0].cpu().numpy()):
+        if score >= score_cutoff:
+            results.append((SKILLS[idx], float(score)))
+    return results
+
+def extract_keywords(text, top_n=30):
+    return kw_model.extract_keywords(text, keyphrase_ngram_range=(1,3), stop_words='english',
+                                     use_mmr=True, diversity=0.7, top_n=top_n)
+
+
 @app.route("/")
-def home(): return jsonify({"message": "Skill Extraction & HR Matching API running"})
+def home():
+    return jsonify({"message": "Skill Extraction & HR Matching API running"})
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000, debug=True)
