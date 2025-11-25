@@ -373,6 +373,83 @@ def test_backend():
         return jsonify({"status": "error", "message": str(e)}), 500
 
 
+
+@app.route('/match_employees', methods=['POST'])
+def match_employees():
+    """
+    HR uploads a job description file (PDF/DOCX).
+    We extract skills → fetch employees from backend → compute similarity → return sorted employees.
+    """
+    try:
+        if 'file' not in request.files:
+            return jsonify({"status": "error", "message": "No file uploaded"}), 400
+
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({"status": "error", "message": "Empty file name"}), 400
+
+        # Save temporarily
+        os.makedirs("uploads", exist_ok=True)
+        file_path = os.path.join("uploads", file.filename)
+        file.save(file_path)
+
+        # Extract skills using your existing processing
+        jd_skills = process_document(file_path)
+        if not jd_skills:
+            return jsonify({"status": "error", "message": "No skills extracted from JD"}), 400
+
+        jd_skill_list = [s[0] for s in jd_skills]
+        jd_text = " ".join(jd_skill_list)
+
+        # 1 FETCH EMPLOYEES FROM SPRING BOOT BACKEND
+        try:
+            employees_response = requests.get(f"{SPRING_BOOT_URL}/api/employees", timeout=10)
+            employees_response.raise_for_status()
+        except Exception as fetch_err:
+            return jsonify({
+                "status": "error",
+                "message": f"Failed to fetch employees from backend: {str(fetch_err)}"
+            }), 500
+
+        employees = employees_response.json()
+
+        # 2️ Compute embeddings
+        jd_embedding = embed_model.encode(jd_text, convert_to_tensor=True)
+
+        scored_employees = []
+
+        for emp in employees:
+            emp_skill_text = " ".join(
+                [skill.get("skillName", "") for skill in emp.get("skills", [])]
+            )
+
+            emp_embedding = embed_model.encode(emp_skill_text, convert_to_tensor=True)
+
+            similarity = util.cos_sim(jd_embedding, emp_embedding).item()
+            similarity = round(float(similarity) * 100, 2)
+
+            scored_employees.append({
+                "name": emp.get("name"),
+                "email": emp.get("email"),
+                "skills": emp.get("skills", []),
+                "similarity": similarity
+            })
+
+        # 3️ Sort employees by similarity
+        scored_employees.sort(key=lambda x: x["similarity"], reverse=True)
+
+        return jsonify({
+            "status": "success",
+            "uploadedJD": file.filename,
+            "jdSkills": jd_skill_list,
+            "employeeCount": len(scored_employees),
+            "matchedEmployees": scored_employees
+        }), 200
+
+    except Exception as e:
+        print("❌ Error:", e)
+        return jsonify({"status": "error", "message": str(e)}), 500
+
 # ---- Main ----
 if __name__ == '__main__':
     print(f"🚀 Starting Flask Scraper on http://localhost:{FLASK_PORT}")
