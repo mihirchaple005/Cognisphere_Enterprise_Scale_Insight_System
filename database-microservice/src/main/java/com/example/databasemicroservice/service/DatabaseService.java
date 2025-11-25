@@ -31,7 +31,9 @@ public class DatabaseService {
         System.out.println("💾 Saving employee: " + dto.getName());
 
         // Create employee entity
+
         Employee employee = new Employee();
+        employee.setId(dto.getId());
         employee.setName(dto.getName());
         employee.setEmail(dto.getEmail());
         employee.setDepartment(dto.getDepartment());

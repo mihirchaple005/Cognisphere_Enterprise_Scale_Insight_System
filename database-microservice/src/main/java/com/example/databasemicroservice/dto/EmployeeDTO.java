@@ -4,6 +4,7 @@ import java.util.List;
 
 public class EmployeeDTO {
 
+    private String id;
     private String name;
     private String email;
     private String department;
@@ -59,6 +60,14 @@ public class EmployeeDTO {
 
     public void setSkills(List<SkillDTO> skills) {
         this.skills = skills;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    public String getId() {
+        return id;
     }
 
     @Override

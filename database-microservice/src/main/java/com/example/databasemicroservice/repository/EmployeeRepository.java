@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface EmployeeRepository extends Neo4jRepository<Employee, Long> {
+public interface EmployeeRepository extends Neo4jRepository<Employee, String> {
 
     // Find employee by email
     Optional<Employee> findByEmail(String email);
