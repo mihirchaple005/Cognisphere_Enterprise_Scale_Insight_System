@@ -204,156 +204,152 @@ def health():
     """Health check"""
     return jsonify({"status": "UP", "service": "Flask Scraper"}), 200
 
-@app.route('/extract/batch', methods=['POST', 'OPTIONS'])
-def extract_batch():
-    """Extract skills from multiple files"""
+
+@app.route('/extract', methods=['POST', 'OPTIONS'])
+def extract():
+    """Extract skills from single file"""
     if request.method == 'OPTIONS':
         return '', 200
 
     try:
-        if 'files' not in request.files:
-            return jsonify({"status": "error", "message": "No files provided"}), 400
+        if 'file' not in request.files:
+            return jsonify({"status": "error", "message": "No file provided"}), 400
 
-        files = request.files.getlist('files')  # IMPORTANT
-        if len(files) == 0:
-            return jsonify({"status": "error", "message": "No files selected"}), 400
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({"status": "error", "message": "No file selected"}), 400
 
         os.makedirs("uploads", exist_ok=True)
+        file_path = os.path.join("uploads", file.filename)
+        file.save(file_path)
 
-        batch_results = []
+        print(f"📄 Processing file: {file.filename}")
+        skills = process_document(file_path)
 
-        for file in files:
-            if file.filename == '':
-                continue
-
-            file_path = os.path.join("uploads", file.filename)
-            file.save(file_path)
-
-            print(f"📄 Processing file: {file.filename}")
-            skills = process_document(file_path)
-
-            if not skills:
-                batch_results.append({
-                    "fileName": file.filename,
-                    "status": "warning",
-                    "message": "No skills found",
-                    "skillCount": 0,
-                    "skills": []
-                })
-                continue
-
-            batch_results.append({
+        if not skills:
+            return jsonify({
+                "status": "warning",
+                "message": "No skills found in document",
                 "fileName": file.filename,
-                "status": "success",
-                "skillCount": len(skills),
-                "skills": [{"skillName": skill, "proficiency": score} for skill, score in skills[:15]]
-            })
+                "skillCount": 0,
+                "skills": []
+            }), 200
 
         return jsonify({
             "status": "success",
-            "fileCount": len(batch_results),
-            "results": batch_results
+            "fileName": file.filename,
+            "skillCount": len(skills),
+            "skills": [{"skillName": skill, "proficiency": score} for skill, score in skills[:15]]
         }), 200
-
     except Exception as e:
-        print(f"❌ Batch extract error: {str(e)}")
+        print(f"❌ Extract error: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({"status": "error", "message": str(e)}), 500
-
 
 
 # ✅ FIXED: Correct endpoint name - extract_and_save (not extract_skills)
-@app.route('/extract_and_save', methods=['POST', 'OPTIONS'])
+@app.route('/extract_and_save', methods=['POST'])
 def extract_and_save():
-    """Extract skills from documents and save to Spring Boot + Neo4j"""
-    if request.method == 'OPTIONS':
-        return '', 200
 
     try:
-        files = request.files.getlist("files")
-        if not files:
-            return jsonify({"status": "error", "message": "No files provided"}), 400
+        data = request.get_json()
+        if not data:
+            return jsonify({"status": "error", "message": "No JSON provided"}), 400
 
-        os.makedirs("uploads", exist_ok=True)
-        all_employees = []
+        user_uid = data.get("uid")
+        name = data.get("name")
+        email = data.get("email")
 
-        for file in files:
-            if file.filename == '':
+        resume_path = data.get("resumePath")
+        certifications = data.get("certifications", [])
+        work_experiences = data.get("workExperiences", [])
+        achievements = data.get("achievements", [])
+
+        all_file_paths = []
+
+        # Add resume
+        if resume_path:
+            all_file_paths.append(resume_path)
+
+        # Add certifications
+        for cert in certifications:
+            if cert.get("certificatePath"):
+                all_file_paths.append(cert["certificatePath"])
+
+        # Add work experience letters
+        for exp in work_experiences:
+            if exp.get("experienceLetterPath"):
+                all_file_paths.append(exp["experienceLetterPath"])
+
+        # Add achievements
+        for ach in achievements:
+            if ach.get("certificatePath"):
+                all_file_paths.append(ach["certificatePath"])
+
+        if not all_file_paths:
+            return jsonify({"status": "error", "message": "No file paths found"}), 400
+
+        print("📄 Files to scan:")
+        for p in all_file_paths:
+            print("   -", p)
+
+        # Extract skills FROM EVERY PATH
+        aggregated_skills = {}
+
+        for path in all_file_paths:
+            if not os.path.exists(path):
+                print(f"⚠️ Missing file: {path}")
                 continue
 
-            file_path = os.path.join("uploads", file.filename)
-            file.save(file_path)
+            skills = process_document(path)
 
-            skills = process_document(file_path)
+            for skill, score in skills:
+                if skill not in aggregated_skills:
+                    aggregated_skills[skill] = score
+                else:
+                    aggregated_skills[skill] = max(aggregated_skills[skill], score)
 
-            if not skills:
-                print(f"⚠️  No skills found in {file.filename}, skipping...")
-                continue
+        if not aggregated_skills:
+            return jsonify({"status": "error", "message": "No skills extracted"}), 400
 
-            employee_name = file.filename.rsplit('.', 1)[0]
-            employee_data = {
-                "name": employee_name,
-                "email": f"{employee_name.lower().replace(' ', '.')}@extracted.local",
-                "skills": [
-                    {
-                        "skillName": skill_name,
-                        "proficiency": round(score, 2)
-                    }
-                    for skill_name, score in skills[:15]
-                ]
-            }
+        # Prepare final employee payload
+        employee_data = {
+            "name": name,
+            "email": email,
+            "skills": [
+                {"skillName": s, "proficiency": round(p, 2)}
+                for s, p in sorted(aggregated_skills.items(), key=lambda x: -x[1])[:20]
+            ]
+        }
 
-            all_employees.append(employee_data)
-            print(f"✓ Prepared: {employee_name} with {len(employee_data['skills'])} skills")
-
-        if not all_employees:
-            return jsonify({"status": "error", "message": "No valid documents found"}), 400
-
-        print(f"\n📤 Sending {len(all_employees)} employees to Spring Boot...")
-        print(f"   URL: {SPRING_BOOT_URL}/api/employees/batch")
+        print("📤 Sending to Spring Boot:", employee_data)
 
         response = requests.post(
-            f"{SPRING_BOOT_URL}/api/employees/batch",
-            json=all_employees,
-            headers={"Content-Type": "application/json"},
-            timeout=30
+            f"{SPRING_BOOT_URL}/api/employees",
+            json=employee_data,
+            headers={"Content-Type": "application/json"}
         )
 
-        print(f"📥 Backend Response Status: {response.status_code}")
-
         if response.status_code in [200, 201]:
-            result = response.json()
-            print(f"✅ Backend response: {result}")
             return jsonify({
                 "status": "success",
-                "message": "Employees extracted and saved successfully",
-                "filesProcessed": len(all_employees),
-                "backendResponse": result
+                "message": "Employee saved!",
+                "backendResponse": response.json()
             }), 201
-        else:
-            print(f"❌ Backend error response: {response.text}")
-            return jsonify({
-                "status": "error",
-                "message": "Failed to save to backend",
-                "backendStatus": response.status_code,
-                "backendResponse": response.text
-            }), 500
 
-    except requests.exceptions.ConnectionError as e:
-        print(f"❌ Connection Error: {e}")
         return jsonify({
             "status": "error",
-            "message": f"Cannot connect to Spring Boot at {SPRING_BOOT_URL}",
-            "hint": "Ensure Spring Boot is running on port 8080"
-        }), 503
+            "backendStatus": response.status_code,
+            "backendResponse": response.text
+        }), 500
+
     except Exception as e:
-        print(f"❌ Error: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({"status": "error", "message": str(e)}), 500
 
-
+    
 @app.route('/test_backend', methods=['GET'])
 def test_backend():
     """Test connection to Spring Boot backend"""
