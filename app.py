@@ -204,48 +204,63 @@ def health():
     """Health check"""
     return jsonify({"status": "UP", "service": "Flask Scraper"}), 200
 
-
-@app.route('/extract', methods=['POST', 'OPTIONS'])
-def extract():
-    """Extract skills from single file"""
+@app.route('/extract/batch', methods=['POST', 'OPTIONS'])
+def extract_batch():
+    """Extract skills from multiple files"""
     if request.method == 'OPTIONS':
         return '', 200
 
     try:
-        if 'file' not in request.files:
-            return jsonify({"status": "error", "message": "No file provided"}), 400
+        if 'files' not in request.files:
+            return jsonify({"status": "error", "message": "No files provided"}), 400
 
-        file = request.files['file']
-        if file.filename == '':
-            return jsonify({"status": "error", "message": "No file selected"}), 400
+        files = request.files.getlist('files')  # IMPORTANT
+        if len(files) == 0:
+            return jsonify({"status": "error", "message": "No files selected"}), 400
 
         os.makedirs("uploads", exist_ok=True)
-        file_path = os.path.join("uploads", file.filename)
-        file.save(file_path)
 
-        print(f"📄 Processing file: {file.filename}")
-        skills = process_document(file_path)
+        batch_results = []
 
-        if not skills:
-            return jsonify({
-                "status": "warning",
-                "message": "No skills found in document",
+        for file in files:
+            if file.filename == '':
+                continue
+
+            file_path = os.path.join("uploads", file.filename)
+            file.save(file_path)
+
+            print(f"📄 Processing file: {file.filename}")
+            skills = process_document(file_path)
+
+            if not skills:
+                batch_results.append({
+                    "fileName": file.filename,
+                    "status": "warning",
+                    "message": "No skills found",
+                    "skillCount": 0,
+                    "skills": []
+                })
+                continue
+
+            batch_results.append({
                 "fileName": file.filename,
-                "skillCount": 0,
-                "skills": []
-            }), 200
+                "status": "success",
+                "skillCount": len(skills),
+                "skills": [{"skillName": skill, "proficiency": score} for skill, score in skills[:15]]
+            })
 
         return jsonify({
             "status": "success",
-            "fileName": file.filename,
-            "skillCount": len(skills),
-            "skills": [{"skillName": skill, "proficiency": score} for skill, score in skills[:15]]
+            "fileCount": len(batch_results),
+            "results": batch_results
         }), 200
+
     except Exception as e:
-        print(f"❌ Extract error: {str(e)}")
+        print(f"❌ Batch extract error: {str(e)}")
         import traceback
         traceback.print_exc()
         return jsonify({"status": "error", "message": str(e)}), 500
+
 
 
 # ✅ FIXED: Correct endpoint name - extract_and_save (not extract_skills)
