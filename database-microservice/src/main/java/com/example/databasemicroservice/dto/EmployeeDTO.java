@@ -8,6 +8,8 @@ public class EmployeeDTO {
     private String email;
     private String department;
     private String position;
+    
+    @valid
     private List<SkillDTO> skills;
 
     // Constructors
