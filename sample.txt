@@ -1,0 +1,8 @@
+John Doe
+Software Engineer
+john.doe@example.com
+
+Skills:
+- Python: Expert in data analysis, web scraping, and API development
+- Machine Learning: Experience with TensorFlow and PyTorch
+- JavaScript: React.js and Node.js development

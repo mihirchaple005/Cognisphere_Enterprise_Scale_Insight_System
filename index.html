@@ -1,0 +1,497 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Employee Skill Extractor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 20px;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 16px;
+            opacity: 0.9;
+        }
+
+        .content {
+            padding: 40px;
+        }
+
+        .status-box {
+            background: #f8f9fa;
+            border-left: 4px solid #667eea;
+            padding: 15px;
+            margin-bottom: 30px;
+            border-radius: 4px;
+        }
+
+        .status-box.success {
+            border-left-color: #28a745;
+            background: #d4edda;
+        }
+
+        .status-box.error {
+            border-left-color: #dc3545;
+            background: #f8d7da;
+        }
+
+        .status-box.warning {
+            border-left-color: #ffc107;
+            background: #fff3cd;
+        }
+
+        .section {
+            margin-bottom: 40px;
+        }
+
+        .section h2 {
+            color: #333;
+            margin-bottom: 20px;
+            font-size: 24px;
+            border-bottom: 2px solid #667eea;
+            padding-bottom: 10px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #333;
+            font-weight: 600;
+        }
+
+        .form-group input[type="file"],
+        .form-group input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.3s;
+        }
+
+        .form-group input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover {
+            background: #218838;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        #extractResult, #extractSaveResult {
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            padding: 20px;
+            margin-top: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .skills-list {
+            list-style: none;
+            margin-top: 15px;
+        }
+
+        .skill-item {
+            background: #f0f4ff;
+            padding: 10px 15px;
+            margin-bottom: 8px;
+            border-radius: 4px;
+            display: flex;
+            justify-content: space-between;
+            border-left: 3px solid #667eea;
+        }
+
+        .skill-name {
+            font-weight: 600;
+            color: #333;
+        }
+
+        .skill-proficiency {
+            color: #667eea;
+            font-weight: 600;
+        }
+
+        .info-box {
+            background: #e7f3ff;
+            border-left: 4px solid #2196F3;
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+            color: #0c5aa0;
+        }
+
+        .loader {
+            display: none;
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loader.show {
+            display: block;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: 1fr;
+            }
+            .header h1 {
+                font-size: 24px;
+            }
+            .content {
+                padding: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎯 Employee Skill Extractor</h1>
+            <p>Extract technical skills from resumes and save to Neo4j database</p>
+        </div>
+
+        <div class="content">
+            <!-- Health Status -->
+            <div id="statusBox" class="status-box">
+                <span id="statusText">🔄 Checking service status...</span>
+            </div>
+
+            <!-- Extract Skills Only -->
+            <div class="section">
+                <h2>📄 Extract Skills (Preview)</h2>
+                <p style="margin-bottom: 15px; color: #666;">Upload a resume to preview extracted skills without saving to database</p>
+
+                <form id="extractForm">
+                    <div class="form-group">
+                        <label for="file">Select Resume (PDF or DOCX):</label>
+                        <input type="file" id="file" name="file" accept=".pdf,.docx" required>
+                    </div>
+                    <button type="submit" class="btn-primary">📋 Extract Skills</button>
+                </form>
+
+                <div id="extractLoader" class="loader"></div>
+                <pre id="extractResult"></pre>
+            </div>
+
+            <!-- Extract & Save -->
+            <div class="section">
+                <h2>💾 Extract & Save to Database</h2>
+                <p style="margin-bottom: 15px; color: #666;">Upload one or multiple resumes to extract skills and save to Neo4j</p>
+
+                <div class="info-box">
+                    ℹ️ This will send skills to Spring Boot backend which will save to Neo4j
+                </div>
+
+                <form id="extractSaveForm">
+                    <div class="form-group">
+                        <label for="filesMultiple">Select Resumes (one or multiple):</label>
+                        <input type="file" id="filesMultiple" name="files" accept=".pdf,.docx" multiple required>
+                    </div>
+                    <button type="submit" class="btn-success">🚀 Extract & Save</button>
+                </form>
+
+                <div id="extractSaveLoader" class="loader"></div>
+                <pre id="extractSaveResult"></pre>
+            </div>
+
+            <!-- Testing Tools -->
+            <div class="section">
+                <h2>🧪 Testing Tools</h2>
+
+                <div class="grid">
+                    <div>
+                        <h3 style="margin-bottom: 15px;">Backend Connection</h3>
+                        <button class="btn-secondary" onclick="testBackend()">Test Spring Boot Connection</button>
+                        <pre id="backendTestResult"></pre>
+                    </div>
+
+                    <div>
+                        <h3 style="margin-bottom: 15px;">Database Status</h3>
+                        <button class="btn-secondary" onclick="testNeo4j()">Check Neo4j Status</button>
+                        <pre id="neo4jTestResult"></pre>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:5000';
+        const BACKEND_BASE = 'http://localhost:8080';
+
+        // ✅ FIXED: Updated to use correct endpoint and allow backend calls
+
+        // Check service status on load
+        document.addEventListener('DOMContentLoaded', function() {
+            checkServiceStatus();
+        });
+
+        async function checkServiceStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+
+                const statusBox = document.getElementById('statusBox');
+                statusBox.className = 'status-box success';
+                statusBox.innerHTML = `<span id="statusText">✅ Flask Scraper is running on http://localhost:5000</span>`;
+            } catch (error) {
+                const statusBox = document.getElementById('statusBox');
+                statusBox.className = 'status-box error';
+                statusBox.innerHTML = `<span id="statusText">❌ Flask Scraper not running. Start it with: python app.py</span>`;
+            }
+        }
+
+        // Extract Form Handler
+        document.getElementById('extractForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const file = document.getElementById('file').files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const loader = document.getElementById('extractLoader');
+            const result = document.getElementById('extractResult');
+
+            loader.classList.add('show');
+            result.textContent = 'Processing...';
+
+            try {
+                const response = await fetch(`${API_BASE}/extract`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                loader.classList.remove('show');
+
+                if (data.status === 'success') {
+                    let output = `✅ SUCCESS\n\nFileName: ${data.fileName}\nSkills Found: ${data.skillCount}\n\nSkills:\n`;
+                    data.skills.forEach(skill => {
+                        output += `  • ${skill.skillName}: ${skill.proficiency}%\n`;
+                    });
+                    result.textContent = output;
+                    result.style.color = '#28a745';
+                } else {
+                    result.textContent = `Error: ${data.message || 'Unknown error'}`;
+                    result.style.color = '#dc3545';
+                }
+            } catch (error) {
+                loader.classList.remove('show');
+                result.textContent = `❌ Error: ${error.message}\n\nMake sure Flask is running on http://localhost:5000`;
+                result.style.color = '#dc3545';
+            }
+        });
+
+        // Extract & Save Form Handler - ✅ FIXED: Updated endpoint
+        document.getElementById('extractSaveForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const files = document.getElementById('filesMultiple').files;
+            if (files.length === 0) {
+                alert('Please select at least one file');
+                return;
+            }
+
+            const formData = new FormData();
+            for (let i = 0; i < files.length; i++) {
+                formData.append('files', files[i]);
+            }
+
+            const loader = document.getElementById('extractSaveLoader');
+            const result = document.getElementById('extractSaveResult');
+
+            loader.classList.add('show');
+            result.textContent = '🔄 Processing and sending to backend...\n\nThis may take a minute...';
+
+            try {
+                // ✅ FIXED: Use correct endpoint: extract_and_save
+                const response = await fetch(`${API_BASE}/extract_and_save`, {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const data = await response.json();
+                loader.classList.remove('show');
+
+                if (data.status === 'success') {
+                    let output = `✅ SUCCESS\n\n`;
+                    output += `Files Processed: ${data.filesProcessed}\n`;
+                    output += `Employees Saved: ${data.backendResponse?.totalCount || 0}\n\n`;
+
+                    output += `Backend Response:\n`;
+                    output += JSON.stringify(data.backendResponse, null, 2);
+
+                    output += `\n\n📊 Next Steps:\n`;
+                    output += `1. Check Neo4j Browser: http://localhost:7474\n`;
+                    output += `2. Login: neo4j / 1234\n`;
+                    output += `3. Run query: MATCH (u:User)-[r:HAS_SKILL]->(s:Skill) RETURN * LIMIT 50\n`;
+
+                    result.textContent = output;
+                    result.style.color = '#28a745';
+                } else {
+                    result.textContent = `❌ Error: ${data.message || JSON.stringify(data)}\n\nMake sure:\n1. Spring Boot is running on port 8080\n2. Neo4j is running and accessible`;
+                    result.style.color = '#dc3545';
+                }
+            } catch (error) {
+                loader.classList.remove('show');
+                result.textContent = `❌ Error: ${error.message}\n\nChecklist:\n✓ Flask running on :5000\n✓ Spring Boot running on :8080\n✓ Neo4j running on :7687`;
+                result.style.color = '#dc3545';
+            }
+        });
+
+        // Test Backend Connection
+        async function testBackend() {
+            const result = document.getElementById('backendTestResult');
+            result.textContent = '🔄 Testing...';
+
+            try {
+                const response = await fetch(`${API_BASE}/test_backend`);
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    result.textContent = `✅ Backend Connected!\n\n${JSON.stringify(data, null, 2)}`;
+                    result.style.color = '#28a745';
+                } else {
+                    result.textContent = `❌ Backend Error\n\n${JSON.stringify(data, null, 2)}`;
+                    result.style.color = '#dc3545';
+                }
+            } catch (error) {
+                result.textContent = `❌ Cannot reach backend\n\nError: ${error.message}\n\nMake sure Spring Boot is running:\nmvn spring-boot:run`;
+                result.style.color = '#dc3545';
+            }
+        }
+
+        // Test Neo4j Connection
+        async function testNeo4j() {
+            const result = document.getElementById('neo4jTestResult');
+            result.textContent = '🔄 Testing...';
+
+            try {
+                // This uses Flask's backend test
+                const response = await fetch(`${API_BASE}/test_backend`);
+                const data = await response.json();
+
+                if (data.status === 'success') {
+                    result.textContent = `✅ Neo4j Connected!\n\nOpen Neo4j Browser:\nhttp://localhost:7474\n\nUsername: neo4j\nPassword: 1234\n\nRun Query:\nMATCH (n) RETURN count(n)`;
+                    result.style.color = '#28a745';
+                } else {
+                    result.textContent = `❌ Neo4j Not Accessible\n\nStart Neo4j:\ndocker run -d --name neo4j -p 7474:7474 -p 7687:7687 -e NEO4J_AUTH=neo4j/1234 neo4j:latest`;
+                    result.style.color = '#dc3545';
+                }
+            } catch (error) {
+                result.textContent = `❌ Connection Failed\n\nError: ${error.message}`;
+                result.style.color = '#dc3545';
+            }
+        }
+
+        // Periodic health check
+        setInterval(checkServiceStatus, 30000);
+    </script>
+</body>
+</html>
